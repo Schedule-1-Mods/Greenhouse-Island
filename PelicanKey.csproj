@@ -17,6 +17,9 @@
     <!-- Build straight into the game's Mods folder so you can just hit Build + launch the game -->
     <OutputPath>$(GameDir)\Mods\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- Just the mod DLL in Mods: no .pdb or .deps.json next to it -->
+    <DebugType>none</DebugType>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
 

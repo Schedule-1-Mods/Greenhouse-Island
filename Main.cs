@@ -38,6 +38,8 @@ namespace PelicanKey
         internal static MelonPreferences_Entry<int> EmployeeCapacity;
 
         private bool _inMain;
+        private float _spikesFrom, _nextSpikeLog;
+        private int _spikes;
         private float _nextLightCheck;
 
         public override void OnInitializeMelon()
@@ -67,6 +69,7 @@ namespace PelicanKey
         {
             try { WagesManagerPatch.TryPatch(HarmonyInstance); } catch { }
             _inMain = sceneName == "Main";
+            _spikesFrom = Time.time + 60f; _spikes = 0;
             DeckBin.Clear();
             IslandBuilder.Clear(true);
             if (!_inMain || !Enabled.Value) return;
@@ -103,6 +106,8 @@ namespace PelicanKey
             {
                 JungleProperty.RescueStrandedEmployees();
                 JungleProperty.MakeListingPhoto();
+                JungleProperty.LogEmployeeStatus();
+                EmployeeCheck.Start();
             }
         }
 
@@ -182,8 +187,19 @@ namespace PelicanKey
         {
             if (!_inMain) return;
 
+            // Hitches: any frame over 100 ms (after the first minute of loading in) goes in the
+            // log with its time, to match against what else was logged then. At most one a second.
+            float dt = Time.unscaledDeltaTime;
+            if (dt > 0.1f && Time.time > _spikesFrom && Time.unscaledTime >= _nextSpikeLog && _spikes < 300)
+            {
+                _nextSpikeLog = Time.unscaledTime + 1f;
+                _spikes++;
+                Log.Msg($"[FrameSpike] {dt * 1000f:0} ms frame.");
+            }
+
             IslandBuilder.Tick(Time.deltaTime);
             IslandNavMesh.Tick();
+            EmployeeCheck.Tick();
             DeckBin.Tick();
             TreeColours.Tick();
             WindmillLights.Tick();

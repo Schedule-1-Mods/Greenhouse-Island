@@ -57,7 +57,10 @@ namespace PelicanKey
             _rainRenderers.Clear();
             _nextRainScan = 0f;
             _stamped = false; _gaveUp = false; _startedAt = -1f; _next = 0f;
+            _mask = null;
         }
+
+        private static MaskController _mask;
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void RestoreMap()
@@ -84,7 +87,9 @@ namespace PelicanKey
             var cam = Camera.main;
             if (!_hideInside || site == null || cam == null) { Show(true); return; }
 
-            if (Time.time >= _nextRainScan) { _nextRainScan = Time.time + 5f; ScanRain(); }
+            // Scanning every loaded object is expensive (a frame hitch each time): look often only
+            // until the rain effects turn up, then just now and then in case the game adds more.
+            if (Time.time >= _nextRainScan) { ScanRain(); _nextRainScan = Time.time + (_rainRenderers.Count > 0 ? 120f : 10f); }
 
             var p = cam.transform.position;
             var flat = new Vector2(p.x - site.Center.x, p.z - site.Center.z).magnitude;
@@ -126,9 +131,11 @@ namespace PelicanKey
                 _rainRenderers.Add(r);
                 if (_hidden) r.enabled = false;
             }
-            // VFX Graph effects and plain particle systems (the weather code has handlers for both).
-            foreach (var vfx in Resources.FindObjectsOfTypeAll<VisualEffect>()) Add(vfx);
-            foreach (var ps in Resources.FindObjectsOfTypeAll<ParticleSystem>()) Add(ps);
+            // VFX Graph effects and plain particle systems (the weather code has handlers for both):
+            // only live ones in the scene, not every loaded asset (much cheaper); one switched on later
+            // is picked up by a later scan.
+            foreach (var vfx in Object.FindObjectsOfType<VisualEffect>()) Add(vfx);
+            foreach (var ps in Object.FindObjectsOfType<ParticleSystem>()) Add(ps);
             if (_rainRenderers.Count != before)
                 Core.Log.Msg($"Rain effects found ({_rainRenderers.Count}): {string.Join(", ", _rainRenderers.ConvertAll(r => r != null ? r.name : "?"))} - hidden while you're inside the dome.");
         }
@@ -297,7 +304,8 @@ namespace PelicanKey
         private static void Push()
         {
             if (_targets.Count == 0) return;
-            var mc = Object.FindObjectOfType<MaskController>();
+            if (_mask == null) _mask = Object.FindObjectOfType<MaskController>(); // once, not every 3 s
+            var mc = _mask;
             if (mc == null) return;
             var map = mc.HeightMap;
             int res = mc.HeightMapResolution;

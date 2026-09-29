@@ -158,6 +158,31 @@ namespace PelicanKey
             if (moved > 0) Core.Log.Msg($"Moved {moved} stranded employee(s) back onto the platform.");
         }
 
+        // Once on load: each of the island's employees, whether they're paid and able to work,
+        // and if not, why. The game only lets an employee work with a bed or locker assigned
+        // (GetHome), paid for the day, and not at the end of the day.
+        public static void LogEmployeeStatus()
+        {
+            if (Property == null) return;
+            try
+            {
+                Core.Log.Msg($"[Employees] {Property.Employees.Count} on Greenhouse Island (owned={Property.IsOwned}).");
+                foreach (var emp in Property.Employees)
+                {
+                    if (emp == null) continue;
+                    bool home = emp.GetHome() != null;
+                    string why = !home ? "NO LOCKER/BED ASSIGNED - place one and assign it to them"
+                               : !emp.PaidForToday ? "not paid today"
+                               : emp.CanWork() ? "working" : "end of day";
+                    Core.Log.Msg($"[Employees]   {((Object)emp).name}: paid={emp.PaidForToday}, locker={(home ? "yes" : "none")} -> {why}");
+                }
+            }
+            catch (System.Exception e)
+            {
+                Core.Log.Warning("[Employees] " + e.Message);
+            }
+        }
+
         private static bool ServerReady()
         {
             try
@@ -215,8 +240,13 @@ namespace PelicanKey
                 prop.EmployeeCapacity = capacity;
                 prop.OwnedByDefault = false;
                 prop.IsOwnedVariable = string.Empty;
-                prop.ContentCullingEnabled = false; // always keep greenhouse items loaded
-                prop.MinimumCullingDistance = 50f;
+                // Normal culling, like every other property: with it off, the game still culls the
+                // contents when you are more than 55 m away, but first un-culls them again - both
+                // every physics tick - so all your pots, plants and lights were switched on and off
+                // constantly whenever you left. Far enough that the island stays complete from the
+                // Docks quay.
+                prop.ContentCullingEnabled = true;
+                prop.MinimumCullingDistance = 75f;
                 prop.DefaultRotation = 0f;
 
                 // Bounds: the whole platform - greenhouse and outside deck (items must be placed
@@ -285,6 +315,16 @@ namespace PelicanKey
 
                 if (!netObj.IsSpawned)
                     Core.Log.Warning("The island property didn't report as spawned - buying it may not work.");
+
+                // A working copy of the game's water tap, behind the stairs in the dome.
+                GreenhouseTap.Create(IslandBuilder.Island, tapObj =>
+                {
+                    bucket.AddObject(tapObj, true);
+                    // No scene: passing one makes FishNet move the object into it first, which Unity
+                    // refuses for anything that isn't top-level (the tap is inside the island) - and
+                    // the spawn is abandoned. It's already in the right scene.
+                    InstanceFinder.ServerManager.Spawn(tapObj, null, default(UnityEngine.SceneManagement.Scene));
+                });
 
                 Property = prop;
 

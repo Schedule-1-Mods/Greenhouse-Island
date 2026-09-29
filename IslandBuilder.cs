@@ -66,6 +66,7 @@ namespace PelicanKey
 
         private static GameObject _root;
         private static Transform _island;
+        public static Transform Island => _island;
         private static Site _site;
         private static float R;
 
@@ -1634,8 +1635,8 @@ FixTreeBark(tree);
             var wallIn = Vector3.Cross(Vector3.up, along);
             if (Vector3.Dot(wallIn, -(w0 + w1)) < 0f) wallIn = -wallIn;   // point into the dome
             // Base wall is 0.3 m thick, centred on the w0-w1 line: its inside face is 0.15 m in.
-            // 0.8 m from the door post, 0.9 m up (the wall is DomeWall = 1.2 m high).
-            var mount = Kit.Group(g, "SaveMount", w0 + along * 0.8f + wallIn * 0.151f + Vector3.up * (GhFloor + 0.9f - w0.y)).transform;
+            // 0.35 m from the door post (right beside the door), 0.9 m up (the wall is DomeWall = 1.2 m high).
+            var mount = Kit.Group(g, "SaveMount", w0 + along * 0.35f + wallIn * 0.151f + Vector3.up * (GhFloor + 0.9f - w0.y)).transform;
             mount.localRotation = Quaternion.LookRotation(wallIn);
             _savePoint = AddSavePoint(mount, Vector3.zero, mount.forward);
             // Check: straight behind the intercom should be the timber wall, a few mm away.
