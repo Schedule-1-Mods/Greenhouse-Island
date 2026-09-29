@@ -67,6 +67,10 @@ namespace PelicanKey
         private static GameObject _root;
         private static Transform _island;
         public static Transform Island => _island;
+        // Where the water tap stands: a point on the inside face of the dome wall left of the
+        // main door (world), and which way that face points (into the dome).
+        public static Vector3 TapWallPoint, TapWallNormal;
+        public static bool TapWallSet;
         private static Site _site;
         private static float R;
 
@@ -1661,6 +1665,18 @@ FixTreeBark(tree);
             if (Vector3.Dot(wallIn, -(w0 + w1)) < 0f) wallIn = -wallIn;   // point into the dome
             // Base wall is 0.3 m thick, centred on the w0-w1 line: its inside face is 0.15 m in.
             // 0.35 m from the door post (right beside the door), 0.9 m up (the wall is DomeWall = 1.2 m high).
+            // The water tap goes on the other side of the doorway: the same kind of spot on the
+            // inside of the base wall to the left of the door (as you face out), floor level.
+            {
+                var l0 = P(doorCol, 0); var l1 = P(doorCol - 1, 0);
+                l0.y = l1.y = GhFloor;
+                var alongL = (l1 - l0).normalized;
+                var inL = Vector3.Cross(Vector3.up, alongL);
+                if (Vector3.Dot(inL, -(l0 + l1)) < 0f) inL = -inL;
+                TapWallPoint = g.TransformPoint(l0 + alongL * 0.6f + inL * 0.151f);
+                TapWallNormal = g.TransformDirection(inL);
+                TapWallSet = true;
+            }
             var mount = Kit.Group(g, "SaveMount", w0 + along * 0.35f + wallIn * 0.151f + Vector3.up * (GhFloor + 0.9f - w0.y)).transform;
             mount.localRotation = Quaternion.LookRotation(wallIn);
             _savePoint = AddSavePoint(mount, Vector3.zero, mount.forward);

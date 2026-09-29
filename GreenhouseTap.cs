@@ -73,14 +73,20 @@ namespace PelicanKey
                 foreach (var hit in Physics.RaycastAll(centre + Vector3.up * 0.05f, Vector3.down, 3f, ~0, QueryTriggerInteraction.Ignore))
                     if (hit.collider != null && !ignore.Contains(hit.collider.Pointer) && centre.y - hit.point.y < height + 2f) { height = centre.y - hit.point.y; break; }
 
-                // Where it goes: the dome's base wall, out from under the stairs.
-                var from = island.TransformPoint(UnderStairs);
-                var outward = island.TransformDirection(new Vector3(-1f, 0f, 0f));
-                Vector3 wallPoint = from + outward * 1.3f, wallNormal = -outward;
-                float best = float.MaxValue;
-                foreach (var hit in Physics.RaycastAll(from, outward, 3f, ~0, QueryTriggerInteraction.Ignore))
-                    if (hit.collider != null && hit.collider.transform.IsChildOf(island) && hit.distance < best)
-                    { best = hit.distance; wallPoint = hit.point; wallNormal = hit.normal; }
+                // Where it goes: on the floor against the dome's base wall, just left of the main
+                // door (as you face out) - see IslandBuilder.TapWallPoint.
+                Vector3 wallPoint, wallNormal;
+                if (IslandBuilder.TapWallSet) { wallPoint = IslandBuilder.TapWallPoint; wallNormal = IslandBuilder.TapWallNormal; }
+                else
+                {
+                    var from = island.TransformPoint(UnderStairs);
+                    var outward = island.TransformDirection(new Vector3(-1f, 0f, 0f));
+                    wallPoint = from + outward * 1.3f; wallNormal = -outward;
+                    float best = float.MaxValue;
+                    foreach (var hit in Physics.RaycastAll(from, outward, 3f, ~0, QueryTriggerInteraction.Ignore))
+                        if (hit.collider != null && hit.collider.transform.IsChildOf(island) && hit.distance < best)
+                        { best = hit.distance; wallPoint = hit.point; wallNormal = hit.normal; }
+                }
                 wallNormal.y = 0f; wallNormal.Normalize();
 
                 // The copy, inactive until it's ready; posed where the original is for now.
@@ -113,8 +119,11 @@ namespace PelicanKey
                 {
                     var o = origRs[i];
                     if (o == null) continue;
-                    bool lower = lowerLods.Contains(o.Pointer);
-                    seen.Add($"{o.name}{(o.isPartOfStaticBatch ? " [merged]" : "")}{(o.enabled ? "" : " [was off]")}{(lower ? " [low detail]" : "")}");
+                    // ("Low detail" in the game's tap LOD group turned out to be its pipe, spout and bend -
+                    // the tap has no other versions of them - so nothing is left out.)
+                    bool lower = false;
+                    bool tagged = lowerLods.Contains(o.Pointer);
+                    seen.Add($"{o.name}{(o.isPartOfStaticBatch ? " [merged]" : "")}{(o.enabled ? "" : " [was off]")}{(tagged ? " [low detail]" : "")}");
                     var go = copyRs[i].gameObject;
                     if (o.isPartOfStaticBatch)
                     {
