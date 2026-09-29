@@ -49,19 +49,13 @@ namespace PelicanKey
             return l;
         }
 
-        // On from sunset (18:00, when the game turns to night) until sunrise (06:00) - and while
-        // the colour menu is open, so you can see what you're picking in the daytime.
-        private static bool _night;
-        public static void SetNight(bool night)
-        {
-            if (_night == night) return;
-            _night = night;
-            Paint();
-        }
+        // The lights stay on around the clock, day and night. (Kept as a call from the island's
+        // day/night switch, which no longer matters here.)
+        public static void SetNight(bool night) { }
 
         private static void Paint()
         {
-            bool on = _night || Visible;
+            const bool on = true;
             // Off: the bulbs are just unlit glass, a dull tint of their colour.
             var body = on ? _colour : Color.Lerp(_colour, new Color(0.35f, 0.35f, 0.38f), 0.7f) * 0.6f;
             body.a = 1f;

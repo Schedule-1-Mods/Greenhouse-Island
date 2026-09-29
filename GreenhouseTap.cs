@@ -17,10 +17,10 @@ namespace PelicanKey
     // are cut back out (see BatchedMesh) so the copy doesn't bring a whole area of scenery with it.
     internal static class GreenhouseTap
     {
-        // Island-local spot beside the bottom of the stairs (they run along the dome wall at
-        // x = -9.6 from z = -2.9 up to z = 2.9), between them and the wall; the tap goes on the wall
+        // Island-local spot beside the foot of the stairs (they run along the dome wall at
+        // x = -9.6 from z = -2.9 up to z = 2.9, 2.5 m wide), just before the first step; the tap goes on the wall
         // straight out from here.
-        private static readonly Vector3 UnderStairs = new Vector3(-10.3f, IslandBuilder.GhFloor + 0.9f, -2.6f);
+        private static readonly Vector3 UnderStairs = new Vector3(-10.95f, IslandBuilder.GhFloor + 0.9f, -3.9f);
 
         public static void Create(Transform island, System.Action<NetworkObject> spawn)
         {
@@ -89,7 +89,15 @@ namespace PelicanKey
                 var copy = Object.Instantiate(src.gameObject, holder.transform, true);
                 copy.name = "GreenhouseTap";
 
-                // Merged (static-batched) parts: cut out and re-added as parts of their own.
+                // The pieces. In the game they're driven by level-of-detail groups (the tap's own,
+                // plus the building's it stands in): when you're far from that building the game
+                // switches them off, so a copy taken while away comes out with pieces missing.
+                // The copy needs no LOD groups (it's one small tap): they go, and every piece is
+                // switched on except the lower-detail versions.
+                //
+                // Pieces merged into the level's big combined meshes (static-batched) are cut out
+                // as parts of their own, whatever their state; the copy's own renderer for those
+                // would draw the whole combined mesh, so it's removed.
                 var origRs = src.GetComponentsInChildren<MeshRenderer>(true);
                 var copyRs = copy.GetComponentsInChildren<MeshRenderer>(true);
                 var lowerLods = new HashSet<System.IntPtr>();
@@ -98,24 +106,37 @@ namespace PelicanKey
                     var lods = lg.GetLODs();
                     for (int i = 1; i < lods.Length; i++) foreach (var r in lods[i].renderers) if (r != null) lowerLods.Add(r.Pointer);
                 }
+                foreach (var lg in copy.GetComponentsInChildren<LODGroup>(true)) Object.DestroyImmediate(lg);
                 int cut = 0;
+                var seen = new List<string>();
                 for (int i = 0; i < origRs.Length && i < copyRs.Length; i++)
                 {
                     var o = origRs[i];
-                    if (o == null || !o.isPartOfStaticBatch) continue;
-                    copyRs[i].enabled = false;
-                    if (lowerLods.Contains(o.Pointer) || !o.enabled) continue;
-                    var mesh = BatchedMesh.Extract(o, out _);
-                    if (mesh == null) continue;
-                    var part = new GameObject(o.name + " (part)");
-                    part.transform.SetPositionAndRotation(o.bounds.center, Quaternion.identity);
-                    part.transform.SetParent(copyRs[i].transform, true);
-                    part.AddComponent<MeshFilter>().sharedMesh = mesh;
-                    var mr = part.AddComponent<MeshRenderer>();
-                    mr.sharedMaterials = o.sharedMaterials;
-                    part.layer = o.gameObject.layer;
-                    cut++;
+                    if (o == null) continue;
+                    bool lower = lowerLods.Contains(o.Pointer);
+                    seen.Add($"{o.name}{(o.isPartOfStaticBatch ? " [merged]" : "")}{(o.enabled ? "" : " [was off]")}{(lower ? " [low detail]" : "")}");
+                    var go = copyRs[i].gameObject;
+                    if (o.isPartOfStaticBatch)
+                    {
+                        var mf = go.GetComponent<MeshFilter>();
+                        Object.DestroyImmediate(copyRs[i]);
+                        if (mf != null) Object.DestroyImmediate(mf);
+                        if (lower) continue;
+                        var mesh = BatchedMesh.Extract(o, out _);
+                        if (mesh == null) continue;
+                        var part = new GameObject(o.name + " (part)");
+                        part.transform.SetPositionAndRotation(o.bounds.center, Quaternion.identity);
+                        part.transform.SetParent(go.transform, true);
+                        part.AddComponent<MeshFilter>().sharedMesh = mesh;
+                        var mr = part.AddComponent<MeshRenderer>();
+                        mr.sharedMaterials = o.sharedMaterials;
+                        mr.shadowCastingMode = o.shadowCastingMode;
+                        part.layer = o.gameObject.layer;
+                        cut++;
+                    }
+                    else copyRs[i].enabled = !lower;
                 }
+                Core.Log.Msg($"Greenhouse tap pieces: {string.Join(", ", seen)}.");
 
                 // Its own network identity (not the original's scene one).
                 foreach (var no in copy.GetComponentsInChildren<NetworkObject>(true)) Object.DestroyImmediate(no);
@@ -141,6 +162,13 @@ namespace PelicanKey
                 if (tap != null) tap.NetworkInitializeIfDisabled();
                 spawn(netObj);
 
+                if (tap != null)
+                {
+                    var box = tap._interactable != null ? tap._interactable.GetComponentInChildren<Collider>(true) : null;
+                    var handle = tap._handleClickable != null ? tap._handleClickable.GetComponentInChildren<Collider>(true) : null;
+                    Core.Log.Msg($"Greenhouse tap: E box {(box != null ? $"on layer {LayerMask.LayerToName(box.gameObject.layer)}, {box.bounds.size.x:0.0}x{box.bounds.size.y:0.0}x{box.bounds.size.z:0.0} m, enabled {box.enabled}" : "MISSING")}; " +
+                                 $"handle {(handle != null ? $"collider enabled {handle.enabled}" : "collider MISSING")}; at {copy.transform.position}.");
+                }
                 Core.Log.Msg($"Greenhouse tap copied from '{template.name}' ({cut} merged part(s) cut out), {height:0.00} m up on the wall behind the stairs" +
                              (netObj.IsSpawned ? "." : " - but it didn't spawn on the network, so it may not fill cans."));
             }

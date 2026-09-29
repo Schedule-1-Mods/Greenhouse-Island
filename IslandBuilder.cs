@@ -501,16 +501,16 @@ namespace PelicanKey
             // Two rings: round the edge, and a second one in between them, nearer the dome. The
             // inner one keeps a wider berth of the walkways (where they come onto the deck and
             // the loading bay), the front where employees wait, and the water tanks.
-            var spots = new List<(float angle, float radius, float height, bool front)>();
-            for (float a = 6f; a < 360f; a += 12f) spots.Add((a, ringR, 6f, false));
-            for (float a = 0f; a < 360f; a += 12f) spots.Add((a, DomeRadius + 2.4f, 5f, false));
+            var spots = new List<(float angle, float radius, float height, bool front, bool entrance)>();
+            for (float a = 6f; a < 360f; a += 12f) spots.Add((a, ringR, 6f, false, false));
+            for (float a = 0f; a < 360f; a += 12f) spots.Add((a, DomeRadius + 2.4f, 5f, false, false));
             // And a few on the stretch from the windmill (past its tanks) towards the front: these
             // go by where things actually are - clear of every spot an employee waits on, the
             // trash can, the tanks, the turbine and the lamps - rather than the front's wide gap.
             foreach (float d in new[] { 17f, 22f, 27f, 32f })
             {
-                spots.Add((_turbineAz + _tankSide * d, PlatformRadius - 1.1f, 5f, true));
-                spots.Add((_turbineAz + _tankSide * (d + 2.5f), DomeRadius + 2.1f, 4.5f, true));
+                spots.Add((_turbineAz + _tankSide * d, PlatformRadius - 1.1f, 5f, true, false));
+                spots.Add((_turbineAz + _tankSide * (d + 2.5f), DomeRadius + 2.1f, 4.5f, true, false));
             }
             // The windmill side is wooded more thickly: extra trees in between both rings there,
             // either side of the turbine and its water tanks.
@@ -519,24 +519,49 @@ namespace PelicanKey
             {
                 float off = Mathf.Abs(Mathf.DeltaAngle(a, _turbineAz)), wood = Mathf.Abs(Mathf.DeltaAngle(a, _woodsAz));
                 if ((off < 22f || off > 85f) && wood > 20f) continue;
-                spots.Add((a, PlatformRadius - 0.9f, 5f, false));
-                spots.Add((a + 6f, DomeRadius + 1.8f, 4.5f, false));
+                spots.Add((a, PlatformRadius - 0.9f, 5f, false, false));
+                spots.Add((a + 6f, DomeRadius + 1.8f, 4.5f, false, false));
             }
 
             // What the front trees keep clear of.
             Vector3 Deck(float az, float r) => new Vector3(Mathf.Sin(az * Mathf.Deg2Rad), 0f, Mathf.Cos(az * Mathf.Deg2Rad)) * r;
+
+            // The Docks side: more trees flanking each bridge as it comes onto the deck - a couple
+            // of rows either side, close in but leaving the path itself, its lamps and the deck
+            // loading bay clear (see keepAway below).
+            foreach (float w in walkways)
+                foreach (float sign in new[] { -1f, 1f })
+                {
+                    foreach (float off in new[] { 15f, 19f, 24f, 30f, 37f })
+                        spots.Add((w + sign * off, PlatformRadius - 1.3f, 6f, true, true));
+                    foreach (float off in new[] { 17f, 25f, 33f })
+                        spots.Add((w + sign * off, DomeRadius + 2.6f, 5f, true, true));
+                }
+
             var keepAway = new List<(Vector3 at, float gap)>
             {
                 (Deck(_turbineAz, TurbineRadius), 2.6f),
                 (new Vector3(TrashCanSpot.x, 0f, TrashCanSpot.y), 2.2f),
             };
+            // Each bridge's path across the deck to the dome (3 m wide with a lamp either side).
+            foreach (float w in walkways)
+                for (float r = 6f; r <= PlatformRadius; r += 2f) keepAway.Add((Deck(w, r), 2.6f));
+            // The loading bay on the deck where the first bridge comes in (see AddDeckBays).
+            if (_site.Docks.Count > 0)
+            {
+                var l = _island.InverseTransformPoint(_site.Docks[0]); l.y = 0f;
+                var outward = l.normalized;
+                var right = Vector3.Cross(Vector3.up, -outward);
+                var bay = outward * 15.2f + right * 3.7f;
+                for (float t = -3f; t <= 3f; t += 1.5f) keepAway.Add((bay + right * t, 2.4f));
+            }
             foreach (var p in TankSpots()) keepAway.Add((p, 1.5f));
             foreach (var p in IdleSpots(30)) keepAway.Add((new Vector3(p.x, 0f, p.z), 1.6f));
             for (int i = 0; i < 6; i++) keepAway.Add((Deck(LampAngle(i), PlatformRadius - 0.6f), 1.2f));
 
             int planted = 0;
             var placed = new List<Vector3>();
-            foreach (var (a, ring, minH, front) in spots)
+            foreach (var (a, ring, minH, front, entrance) in spots)
             {
                 bool inner = ring < ringR;
                 bool blocked = false;
@@ -546,7 +571,7 @@ namespace PelicanKey
                     if (Mathf.Abs(Mathf.DeltaAngle(a, angle)) < width + (inner && angle == 180f ? 18f : 0f)) { blocked = true; break; }
                 }
                 foreach (float w in walkways)
-                    if (Mathf.Abs(Mathf.DeltaAngle(a, w)) < (inner ? 30f : 22f)) blocked = true;
+                    if (Mathf.Abs(Mathf.DeltaAngle(a, w)) < (entrance ? 12f : inner ? 30f : 22f)) blocked = true;
                 if (inner && !front && Mathf.Abs(Mathf.DeltaAngle(a, _tankAz)) < 20f) blocked = true;   // the water tanks
                 if (blocked) continue;
 
@@ -1322,7 +1347,7 @@ FixTreeBark(tree);
         // opening starts about a third of the way up (over 3 m clear under the floor there, so you
         // can come down it without the floor edge in your face) and runs to the top; the bottom of
         // the flight stays under the glass floor. (On the floor's 3-degree grid.)
-        public const float UpperRIn = 4.5f, UpperRHoleIn = 8.8f, UpperRHoleOut = 10.8f;
+        public const float UpperRIn = 4.5f, UpperRHoleIn = 8.1f, UpperRHoleOut = 11.05f;
         public const float UpperHoleFrom = 258f, UpperHoleTo = 289f;
 
         // Buildable tiles. Ground floor: the ring between the plant's planter and the dome wall.
@@ -1443,15 +1468,15 @@ FixTreeBark(tree);
                 new Vector3(stairX, y + 0.01f, zTop),
                 new Vector3(stairX, y + 0.01f, zTop + 0.9f),
             };
-            Kit.MeshObject(f, "Stairs", Kit.Ribbon(path, 0.65f, 0.18f, 1.6f), new[] { planks }, true);
+            Kit.MeshObject(f, "Stairs", Kit.Ribbon(path, 1.25f, 0.18f, 1.6f), new[] { planks }, true);
             float rise = y - GhFloor;
             int steps = Mathf.RoundToInt(rise / 0.2f);
             for (int s = 0; s < steps; s++)
             {
                 float k = (s + 0.5f) / steps;
-                Kit.Box(f, "Tread", new Vector3(stairX, GhFloor + rise * k + 0.04f, Mathf.Lerp(zBottom, zTop, k)), new Vector3(1.28f, 0.05f, 0.2f), mDarkWood, false);
+                Kit.Box(f, "Tread", new Vector3(stairX, GhFloor + rise * k + 0.04f, Mathf.Lerp(zBottom, zTop, k)), new Vector3(2.48f, 0.05f, 0.2f), mDarkWood, false);
             }
-            foreach (float side in new[] { -0.62f, 0.62f })
+            foreach (float side in new[] { -1.22f, 1.22f })
             {
                 var a = new Vector3(stairX + side, GhFloor + 1f, zBottom);
                 var b = new Vector3(stairX + side, y + 1f, zTop);
