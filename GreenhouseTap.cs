@@ -161,6 +161,13 @@ namespace PelicanKey
                 backDist = Mathf.Clamp(backDist, 0.15f, 0.3f);
                 var pos = wallPoint + wallNormal * backDist;
                 copy.transform.position = new Vector3(pos.x, floorY + Mathf.Max(0f, height), pos.z);
+
+                // Turned half way round on its pipe (the pipe stays where it is against the wall;
+                // the spout and drain swing to the other side).
+                var pivot = copy.transform.position;
+                foreach (var t in copy.GetComponentsInChildren<Transform>(true))
+                    if (t.name == "Pipe") { pivot = t.position; break; }
+                copy.transform.RotateAround(new Vector3(pivot.x, copy.transform.position.y, pivot.z), Vector3.up, 180f);
                 // Fully built while switched off, then on (like the island property itself), so
                 // its network parts wake up with everything in place.
                 copy.SetActive(false);
