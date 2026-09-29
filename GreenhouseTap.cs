@@ -156,6 +156,9 @@ namespace PelicanKey
                 var turn = Quaternion.FromToRotation(new Vector3(back.x, 0f, back.z).normalized, -wallNormal);
                 copy.transform.rotation = turn * copy.transform.rotation;
                 var floorY = island.TransformPoint(new Vector3(0f, IslandBuilder.GhFloor, 0f)).y;
+                // Right up against the wall (the original's back-to-wall distance, kept to a tight range:
+                // the measurement can pick up something further off than its own wall).
+                backDist = Mathf.Clamp(backDist, 0.15f, 0.3f);
                 var pos = wallPoint + wallNormal * backDist;
                 copy.transform.position = new Vector3(pos.x, floorY + Mathf.Max(0f, height), pos.z);
                 // Fully built while switched off, then on (like the island property itself), so
@@ -163,6 +166,17 @@ namespace PelicanKey
                 copy.SetActive(false);
                 copy.transform.SetParent(island, true);
                 Object.Destroy(holder);
+
+                // Is anything of yours already standing where the tap goes?
+                var blockers = new List<string>();
+                foreach (var col in Physics.OverlapBox(copy.transform.position + Vector3.up * 0.7f, new Vector3(0.3f, 0.7f, 0.3f), copy.transform.rotation, ~0, QueryTriggerInteraction.Ignore))
+                {
+                    if (col == null || col.transform.IsChildOf(copy.transform)) continue;
+                    var item = col.GetComponentInParent<Il2CppScheduleOne.EntityFramework.BuildableItem>();
+                    if (item != null && !blockers.Contains(item.name)) blockers.Add(item.name);
+                }
+                if (blockers.Count > 0)
+                    Core.Log.Warning($"Something you placed is in the tap's spot, so it may be hidden or hard to reach: {string.Join(", ", blockers)}. Move it, or the tap.");
 
                 copy.SetActive(true);
                 byte index = 0;

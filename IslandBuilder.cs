@@ -1673,7 +1673,7 @@ FixTreeBark(tree);
                 var alongL = (l1 - l0).normalized;
                 var inL = Vector3.Cross(Vector3.up, alongL);
                 if (Vector3.Dot(inL, -(l0 + l1)) < 0f) inL = -inL;
-                TapWallPoint = g.TransformPoint(l0 + alongL * 0.6f + inL * 0.151f);
+                TapWallPoint = g.TransformPoint(l0 + alongL * 0.5f + inL * 0.151f);
                 TapWallNormal = g.TransformDirection(inL);
                 TapWallSet = true;
             }
