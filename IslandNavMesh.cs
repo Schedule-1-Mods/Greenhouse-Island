@@ -8,8 +8,8 @@ namespace PelicanKey
 {
     // The island is new ground, so the game's baked NavMesh doesn't cover it and employees
     // couldn't walk anywhere. This bakes one at runtime from the island's actual colliders
-    // (ground, greenhouse walls, tree trunks, and anything you've built), for every agent type,
-    // and re-bakes when items are placed or removed so employees path around them.
+    // (ground, greenhouse walls, tree trunks - but not what you've placed, just like the game's
+    // own navmeshes), for every agent type.
     //
     // The walkways are baked in too, and the whole thing is its own navmesh area (IslandArea).
     // Separate navmeshes don't join up, and navmesh links can't be used (the game treats every
@@ -35,6 +35,7 @@ namespace PelicanKey
         private static int _mask;
         private static int _lastItemCount = -1;
         private static float _nextCheck;
+        private static bool _async = true;
 
         public static void Clear()
         {
@@ -100,6 +101,7 @@ namespace PelicanKey
 
             var prop = JungleProperty.Property;
             if (prop == null) return;
+            LetEmployeesOn(prop);
             int count;
             try { count = prop.BuildableItems.Count; } catch { return; }
             if (_lastItemCount == -1) { _lastItemCount = count; return; }
@@ -110,13 +112,48 @@ namespace PelicanKey
             {
                 var sources = CollectSources();
                 foreach (var b in _baked)
+                {
+                    // In the background (no frame hitch when you place something); the old
+                    // all-at-once rebuild if this game build lacks the async version.
+                    if (_async)
+                    {
+                        try { NavMeshBuilder.UpdateNavMeshDataAsync(b.Data, NavMesh.GetSettingsByID(b.AgentTypeId), sources, _bounds); continue; }
+                        catch { _async = false; }
+                    }
                     NavMeshBuilder.UpdateNavMeshData(b.Data, NavMesh.GetSettingsByID(b.AgentTypeId), sources, _bounds);
+                }
                 NavMeshUtility.ClearCache();
             }
             catch (System.Exception e)
             {
                 Core.Log.Warning("Island navmesh update failed: " + e.Message);
             }
+        }
+
+        // The island's employees need its area in their walkable mask, or the game can't put them
+        // on its navmesh at all: they stand still, and every behaviour tick the game retries and
+        // logs "Failed to create agent" - thousands of times, which tanks the frame rate. Add the
+        // island area to their mask (keeping the game's own areas) and set them back down.
+        private static void LetEmployeesOn(Il2CppScheduleOne.Property.Property prop)
+        {
+            const int islandBit = 1 << IslandArea;
+            int fixedCount = 0;
+            try
+            {
+                foreach (var emp in prop.Employees)
+                {
+                    var agent = emp?.Movement?.Agent;
+                    if (agent == null || (agent.areaMask & islandBit) != 0) continue;
+                    agent.areaMask |= islandBit;
+                    if (!agent.isOnNavMesh) Compat.Warp(emp.Movement, emp.transform.position);
+                    fixedCount++;
+                }
+            }
+            catch (System.Exception e)
+            {
+                Core.Log.Warning("Couldn't let the island's employees onto its navmesh: " + e.Message);
+            }
+            if (fixedCount > 0) Core.Log.Msg($"Let {fixedCount} employee(s) walk on the island's navmesh.");
         }
 
         // Everything solid on the platform (the island, trees, what you've built), plus the
@@ -136,6 +173,12 @@ namespace PelicanKey
                 var src = all[i];
                 var comp = src.component;
                 if (comp == null) continue;
+                // Nothing you've placed (pots, racks, lockers, stations...): the game's own
+                // navmeshes are baked without them too, and its employees need to walk right up
+                // to each item's access point (within 1 m) to use it. Cutting placed items out of
+                // the walkable area left those spots off it, so every job failed its "can I get
+                // there" check and the employee gave up and went to wait outside.
+                if (comp.GetComponentInParent<Il2CppScheduleOne.EntityFramework.BuildableItem>() != null) continue;
                 bool ours = root != null && comp.transform.IsChildOf(root);
                 if (!ours)
                 {
