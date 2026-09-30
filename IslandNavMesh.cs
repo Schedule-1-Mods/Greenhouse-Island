@@ -188,7 +188,13 @@ namespace PelicanKey
                     c.y = 0f;
                     if (c.magnitude > reach) continue;
                 }
-                src.area = IslandArea;
+                // The weed plant and its planter (the ring of soil round its trunk) are not for
+                // walking on: marked "Not Walkable" (area 1), so employees are never sent up onto
+                // them, where they could end up wedged against the trunk.
+                bool plantZone = false;
+                for (var t = comp.transform; t != null && t != root; t = t.parent)
+                    if (t.name == "WeedPlant") { plantZone = true; break; }
+                src.area = plantZone ? 1 : IslandArea;
                 kept.Add(src);
             }
             return kept;

@@ -39,6 +39,8 @@ namespace PelicanKey
 
         private bool _inMain;
         private float _spikesFrom, _nextSpikeLog;
+        private float _nextCostLog;
+        private int _costLogs;
         private int _spikes;
         private float _nextLightCheck;
 
@@ -61,13 +63,13 @@ namespace PelicanKey
         // Every mod is loaded by now, so other mods we add Greenhouse Island to can be found.
         public override void OnLateInitializeMelon()
         {
-            try { WagesManagerPatch.TryPatch(HarmonyInstance); }
+            try { WagesManagerPatch.TryPatch(HarmonyInstance); WarpWatch.TryPatch(HarmonyInstance); }
             catch (System.Exception e) { Log.Warning("Couldn't hook into the Wages Manager app: " + e.Message); }
         }
 
         public override void OnSceneWasInitialized(int buildIndex, string sceneName)
         {
-            try { WagesManagerPatch.TryPatch(HarmonyInstance); } catch { }
+            try { WagesManagerPatch.TryPatch(HarmonyInstance); WarpWatch.TryPatch(HarmonyInstance); } catch { }
             _inMain = sceneName == "Main";
             _spikesFrom = Time.time + 60f; _spikes = 0;
             DeckBin.Clear();
@@ -107,7 +109,6 @@ namespace PelicanKey
                 JungleProperty.RescueStrandedEmployees();
                 JungleProperty.MakeListingPhoto();
                 JungleProperty.LogEmployeeStatus();
-                EmployeeCheck.Start();
             }
         }
 
@@ -197,9 +198,10 @@ namespace PelicanKey
                 Log.Msg($"[FrameSpike] {dt * 1000f:0} ms frame.");
             }
 
+            var cost = System.Diagnostics.Stopwatch.StartNew();
             IslandBuilder.Tick(Time.deltaTime);
             IslandNavMesh.Tick();
-            EmployeeCheck.Tick();
+            EmployeeWatch.Tick();
             DeckBin.Tick();
             TreeColours.Tick();
             WindmillLights.Tick();
@@ -217,6 +219,15 @@ namespace PelicanKey
                 }
                 catch { }
                 IslandBuilder.SetNight(night);
+            }
+
+            // How long the island's own work took this frame (the log says if it is ever over 8 ms).
+            double ms = cost.Elapsed.TotalMilliseconds;
+            if (ms > 8.0 && _costLogs < 40 && Time.unscaledTime >= _nextCostLog)
+            {
+                _nextCostLog = Time.unscaledTime + 5f;
+                _costLogs++;
+                Log.Msg($"[Cost] Greenhouse Island's update took {ms:0} ms this frame.");
             }
         }
     }
