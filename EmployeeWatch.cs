@@ -30,6 +30,7 @@ namespace PelicanKey
             {
                 foreach (var emp in prop.Employees)
                 {
+                    if (emp != null) UmbrellaGuard.Lower(emp);   // no umbrella under the dome
                     var agent = emp != null && emp.Movement != null ? emp.Movement.Agent : null;
                     if (agent == null) continue;
 

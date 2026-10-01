@@ -63,13 +63,13 @@ namespace PelicanKey
         // Every mod is loaded by now, so other mods we add Greenhouse Island to can be found.
         public override void OnLateInitializeMelon()
         {
-            try { WagesManagerPatch.TryPatch(HarmonyInstance); WarpWatch.TryPatch(HarmonyInstance); }
+            try { WagesManagerPatch.TryPatch(HarmonyInstance); WarpWatch.TryPatch(HarmonyInstance); UmbrellaGuard.TryPatch(HarmonyInstance); }
             catch (System.Exception e) { Log.Warning("Couldn't hook into the Wages Manager app: " + e.Message); }
         }
 
         public override void OnSceneWasInitialized(int buildIndex, string sceneName)
         {
-            try { WagesManagerPatch.TryPatch(HarmonyInstance); WarpWatch.TryPatch(HarmonyInstance); } catch { }
+            try { WagesManagerPatch.TryPatch(HarmonyInstance); WarpWatch.TryPatch(HarmonyInstance); UmbrellaGuard.TryPatch(HarmonyInstance); } catch { }
             _inMain = sceneName == "Main";
             _spikesFrom = Time.time + 60f; _spikes = 0;
             DeckBin.Clear();

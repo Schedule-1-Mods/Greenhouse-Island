@@ -81,6 +81,18 @@ namespace PelicanKey
         private static float _nextRainScan;
         private static readonly List<Renderer> _rainRenderers = new List<Renderer>();
 
+        // Is this point inside the dome (on either floor, under its glass)?
+        public static bool UnderDome(Vector3 p)
+        {
+            var site = IslandBuilder.Current?.Site;
+            if (site == null) return false;
+            var flat = new Vector2(p.x - site.Center.x, p.z - site.Center.z).magnitude;
+            float R = IslandBuilder.DomeRadius;
+            float floor = site.Center.y + IslandBuilder.GhFloor - 0.5f;
+            float roof = site.Center.y + IslandBuilder.GhFloor + IslandBuilder.DomeWall + Mathf.Sqrt(Mathf.Max(0f, R * R - flat * flat));
+            return flat < R - 0.2f && p.y > floor && p.y < roof;
+        }
+
         public static void Frame()
         {
             var site = IslandBuilder.Current?.Site;

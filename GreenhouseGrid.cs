@@ -16,6 +16,9 @@ namespace PelicanKey
 
         public enum Floor { Ground, Upper, Deck }
 
+        // How far above a floor surface its tiles sit.
+        public const float TileLift = 0.04f;
+
         public static void Clear() { Grid = null; UpperGrid = null; DeckGrid = null; }
 
         // floorY: height of the floor (island-local); include(x, z): whether a tile centre is buildable.
@@ -44,6 +47,7 @@ namespace PelicanKey
                 // Where a tile sits relative to its grid, beyond x/y * TileSize.
                 var tplLocal = template.transform.InverseTransformPoint(tplTile.transform.position);
                 var offset = tplLocal - new Vector3(tplTile.x * ts, 0f, tplTile.y * ts);
+                Core.Log.Msg($"Build tiles ({floor}): the game's own tiles sit {offset.y:0.000} m off their grid; ours are lifted {TileLift:0.00} m above the floor so the placement squares show.");
                 var tileRot = Quaternion.Inverse(template.transform.rotation) * tplTile.transform.rotation;
 
                 int w = Mathf.FloorToInt(halfSize.x * 2f / ts);
@@ -55,7 +59,10 @@ namespace PelicanKey
                 // Must sit inside the property's hierarchy: placed items find their property by
                 // walking up from the grid (and are parented to the property's contents container).
                 holder.transform.SetParent(owner.transform, false);
-                holder.transform.localPosition = new Vector3(-w * ts * 0.5f, floorY, -h * ts * 0.5f);
+                // Tiles (and the placement squares the game draws on them, and where items stand) sit
+                // a few cm above the floor surface: right on it, the planks (and the glass floor
+                // upstairs) hide the squares.
+                holder.transform.localPosition = new Vector3(-w * ts * 0.5f, floorY + TileLift, -h * ts * 0.5f);
 
                 var go = new GameObject($"JungleGreenhouse{floor}Grid");
                 go.transform.SetParent(holder.transform, false);
