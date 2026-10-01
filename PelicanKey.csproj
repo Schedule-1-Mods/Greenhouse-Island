@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
-    <AssemblyName>Greenhouse Island</AssemblyName>
+    <AssemblyName>✽ Greenhouse Island</AssemblyName>
     <RootNamespace>PelicanKey</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
