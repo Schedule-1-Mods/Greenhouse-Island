@@ -6,7 +6,7 @@ using Il2CppScheduleOne.GameTime;
 using Il2CppScheduleOne.PlayerScripts;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(PelicanKey.Core), "Greenhouse Island", "1.0.0", "Cassy")]
+[assembly: MelonInfo(typeof(PelicanKey.Core), "✽ Greenhouse Island", "1.0.0", "Cassy")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace PelicanKey
