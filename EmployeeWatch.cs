@@ -54,12 +54,13 @@ namespace PelicanKey
                     if (!NavMesh.SamplePosition(from, out var hit, 4f, agent.areaMask) && !NavMesh.SamplePosition(from, out hit, 8f, NavMesh.AllAreas))
                         continue;
 
-                    Compat.Warp(emp.Movement, hit.position);
-
+                    // At most one rescue per employee every 10 s: a warp is not free (it is sent over
+                    // the network too), and one that doesn't take must not be repeated in a storm.
                     string name = ((Object)emp).name;
-                    if (!_logged.TryGetValue(name, out float last) || Time.time - last > 30f)
+                    if (_logged.TryGetValue(name, out float last) && Time.time - last < 10f) continue;
+                    _logged[name] = Time.time;
+                    Compat.Warp(emp.Movement, hit.position);
                     {
-                        _logged[name] = Time.time;
                         Core.Log.Msg($"[EmployeeWatch] {name} was {(inPlanter ? "stuck in the plant's planter" : "off the walkable map")} at {p}; set back on the floor at {hit.position}.");
                     }
                 }

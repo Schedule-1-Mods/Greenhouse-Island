@@ -111,31 +111,19 @@ namespace PelicanKey
         private static void ScanRain()
         {
             int before = _rainRenderers.Count;
-            bool IsRain(Transform x)
+            // The game's rain effects all hang under its RainController. Asking for just those
+            // (one or two objects) is far cheaper than going through every particle system and
+            // visual effect in the scene, which was a hitch of 10-25 ms each time it ran.
+            foreach (var rc in Object.FindObjectsOfType<RainController>())
             {
-                for (var t = x; t != null; t = t.parent)
+                if (rc == null) continue;
+                foreach (var r in rc.GetComponentsInChildren<Renderer>(true))
                 {
-                    if (t.GetComponent<RainController>() != null) return true;
-                    // "rain" as its own word (not terrain, train, drain, grain, brain...).
-                    string raw = t.name, n = raw.ToLowerInvariant();
-                    for (int at = n.IndexOf("rain"); at >= 0; at = n.IndexOf("rain", at + 1))
-                        if (at == 0 || !char.IsLetter(raw[at - 1]) || char.IsUpper(raw[at])) return true;   // "Rain", "VFX_Rain", "HeavyRain"
+                    if (r == null || _rainRenderers.Contains(r)) continue;
+                    _rainRenderers.Add(r);
+                    if (_hidden) r.enabled = false;
                 }
-                return false;
             }
-            void Add(Component c)
-            {
-                if (c == null || !c.gameObject.scene.IsValid() || !IsRain(c.transform)) return;
-                var r = c.GetComponent<Renderer>();
-                if (r == null || _rainRenderers.Contains(r)) return;
-                _rainRenderers.Add(r);
-                if (_hidden) r.enabled = false;
-            }
-            // VFX Graph effects and plain particle systems (the weather code has handlers for both):
-            // only live ones in the scene, not every loaded asset (much cheaper); one switched on later
-            // is picked up by a later scan.
-            foreach (var vfx in Object.FindObjectsOfType<VisualEffect>()) Add(vfx);
-            foreach (var ps in Object.FindObjectsOfType<ParticleSystem>()) Add(ps);
             if (_rainRenderers.Count != before)
                 Core.Log.Msg($"Rain effects found ({_rainRenderers.Count}): {string.Join(", ", _rainRenderers.ConvertAll(r => r != null ? r.name : "?"))} - hidden while you're inside the dome.");
         }

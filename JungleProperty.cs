@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using HarmonyLib;
 using Il2CppFishNet;
 using Il2CppFishNet.Managing.Object;
@@ -160,22 +161,45 @@ namespace PelicanKey
 
         // Once on load: each of the island's employees, whether they're paid and able to work,
         // and if not, why. The game only lets an employee work with a bed or locker assigned
-        // (GetHome), paid for the day, and not at the end of the day.
+        // (GetHome), paid for the day, and not at the end of the day. A short summary also pops up
+        // on screen, because the usual reason a worker stands idle is something still to set up.
         public static void LogEmployeeStatus()
         {
             if (Property == null) return;
             try
             {
                 Core.Log.Msg($"[Employees] {Property.Employees.Count} on Greenhouse Island (owned={Property.IsOwned}).");
+                int noLocker = 0, unpaid = 0;
                 foreach (var emp in Property.Employees)
                 {
                     if (emp == null) continue;
                     bool home = emp.GetHome() != null;
+                    if (!home) noLocker++;
+                    else if (!emp.PaidForToday) unpaid++;
                     string why = !home ? "NO LOCKER/BED ASSIGNED - place one and assign it to them"
                                : !emp.PaidForToday ? "not paid today"
                                : emp.CanWork() ? "working" : "end of day";
                     Core.Log.Msg($"[Employees]   {((Object)emp).name}: paid={emp.PaidForToday}, locker={(home ? "yes" : "none")} -> {why}");
                 }
+
+                // Pots with no harvest destination: the botanist says "plant ready for harvest but
+                // it has no destination" and stops.
+                int pots = 0, noDestination = 0;
+                foreach (var item in Property.BuildableItems)
+                {
+                    var pot = item != null ? item.TryCast<Il2CppScheduleOne.ObjectScripts.Pot>() : null;
+                    if (pot == null) continue;
+                    pots++;
+                    var cfg = pot.Configuration != null ? pot.Configuration.TryCast<Il2CppScheduleOne.Management.PotConfiguration>() : null;
+                    if (cfg != null && cfg.Destination != null && cfg.Destination.SelectedObject == null) noDestination++;
+                }
+                Core.Log.Msg($"[Employees] {pots} pot(s), {noDestination} with no harvest destination.");
+
+                var problems = new List<string>();
+                if (noLocker > 0) problems.Add($"{noLocker} employee{(noLocker == 1 ? "" : "s")} without a locker");
+                if (unpaid > 0) problems.Add($"{unpaid} unpaid");
+                if (noDestination > 0) problems.Add($"{noDestination} pot{(noDestination == 1 ? "" : "s")} with no harvest destination");
+                if (problems.Count > 0) Hud.Toast("Greenhouse Island: " + string.Join(", ", problems) + " - they can't work until that's set up.", 12f);
             }
             catch (System.Exception e)
             {
