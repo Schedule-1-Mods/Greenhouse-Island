@@ -255,6 +255,9 @@ namespace PelicanKey
                 var t = _root.transform;
 
                 netObj = _root.AddComponent<NetworkObject>();
+                // The same initialise order as the game's own properties (FishNet logs "initialize order of 0
+                // ... will cause issues" for a property left at the default).
+                try { netObj._initializeOrder = template.NetworkObject._initializeOrder; } catch { }
                 var prop = _root.AddComponent<Property>();
 
                 prop.propertyName = Name;

@@ -31,7 +31,7 @@ namespace PelicanKey
                 foreach (var emp in prop.Employees)
                 {
                     if (emp != null) UmbrellaGuard.Lower(emp);   // no umbrella under the dome
-                    var agent = emp != null && emp.Movement != null ? emp.Movement.Agent : null;
+                    var agent = emp != null ? Compat.AgentOf(emp.Movement) : null;
                     if (agent == null) continue;
 
                     var p = emp.transform.position;
@@ -39,7 +39,7 @@ namespace PelicanKey
                     // Only the platform itself (walkways and land are the game's to look after).
                     if (flat.magnitude > site.Radius || Mathf.Abs(p.y - site.Center.y) > 3f) continue;
 
-                    bool inPlanter = flat.magnitude < IslandBuilder.TreePlanterRadius + 0.3f;
+                    bool inPlanter = flat.magnitude < IslandBuilder.TreePlanterRadius - 0.9f + 0.4f;   // the planter ring (1.3 m) and a little
                     bool offMap = !agent.isOnNavMesh;
                     if (!inPlanter && !offMap) continue;
 

@@ -6,7 +6,7 @@ using Il2CppScheduleOne.GameTime;
 using Il2CppScheduleOne.PlayerScripts;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(PelicanKey.Core), "✽ Greenhouse Island", "1.0.0", "Cassy")]
+[assembly: MelonInfo(typeof(PelicanKey.Core), "✽ Greenhouse Island", "1.1.0", "Cassy")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
 namespace PelicanKey
@@ -63,14 +63,15 @@ namespace PelicanKey
         // Every mod is loaded by now, so other mods we add Greenhouse Island to can be found.
         public override void OnLateInitializeMelon()
         {
-            try { WagesManagerPatch.TryPatch(HarmonyInstance); WarpWatch.TryPatch(HarmonyInstance); UmbrellaGuard.TryPatch(HarmonyInstance); }
+            try { WagesManagerPatch.TryPatch(HarmonyInstance); WarpWatch.TryPatch(HarmonyInstance); UmbrellaGuard.TryPatch(HarmonyInstance); RainShelter.TryPatch(HarmonyInstance); }
             catch (System.Exception e) { Log.Warning("Couldn't hook into the Wages Manager app: " + e.Message); }
         }
 
         public override void OnSceneWasInitialized(int buildIndex, string sceneName)
         {
-            try { WagesManagerPatch.TryPatch(HarmonyInstance); WarpWatch.TryPatch(HarmonyInstance); UmbrellaGuard.TryPatch(HarmonyInstance); } catch { }
+            try { WagesManagerPatch.TryPatch(HarmonyInstance); WarpWatch.TryPatch(HarmonyInstance); UmbrellaGuard.TryPatch(HarmonyInstance); RainShelter.TryPatch(HarmonyInstance); } catch { }
             _inMain = sceneName == "Main";
+            if (_inMain) RainShelter.ArmFallback();
             _spikesFrom = Time.time + 60f; _spikes = 0;
             DeckBin.Clear();
             IslandBuilder.Clear(true);
@@ -198,6 +199,9 @@ namespace PelicanKey
                 Log.Msg($"[FrameSpike] {dt * 1000f:0} ms frame.");
             }
 
+#if DEVTEST
+            DevTest.Tick();
+#endif
             var cost = System.Diagnostics.Stopwatch.StartNew();
             IslandBuilder.Tick(Time.deltaTime);
             IslandNavMesh.Tick();

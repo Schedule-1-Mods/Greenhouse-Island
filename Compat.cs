@@ -12,6 +12,16 @@ namespace PelicanKey
     {
         private static MethodInfo _warp;
 
+        // An NPC's walking agent. 0.4.6 has it as NPCMovement.Agent; 0.4.7 took that member away
+        // (it's in a private field now), so ask for the NavMeshAgent component itself, which is
+        // the same object on both.
+        public static UnityEngine.AI.NavMeshAgent AgentOf(NPCMovement movement)
+        {
+            if (movement == null) return null;
+            try { return movement.GetComponent<UnityEngine.AI.NavMeshAgent>() ?? movement.GetComponentInParent<UnityEngine.AI.NavMeshAgent>(); }
+            catch { return null; }
+        }
+
         // NPCMovement.Warp: 0.4.6 has Warp(Vector3), 0.4.7 has Warp(Vector3, Quaternion).
         public static void Warp(NPCMovement movement, Vector3 position)
         {

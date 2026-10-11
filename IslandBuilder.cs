@@ -156,6 +156,8 @@ namespace PelicanKey
             // Make the new colliders live in the physics scene now, not at the next physics step.
             Physics.SyncTransforms();
             Core.Log.Msg($"Greenhouse Island (floating platform) built at {site.Center} with {_docks.Count} walkway(s) from the shore ({walls} invisible wall(s) opened).");
+            IslandOptimiser.Run(_root.transform);
+            IslandStats.Log(_root.transform);
         }
 
         public static void Tick(float dt)

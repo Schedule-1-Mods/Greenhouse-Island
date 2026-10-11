@@ -142,7 +142,7 @@ namespace PelicanKey
             {
                 foreach (var emp in prop.Employees)
                 {
-                    var agent = emp?.Movement?.Agent;
+                    var agent = emp != null ? Compat.AgentOf(emp.Movement) : null;
                     if (agent == null || (agent.areaMask & islandBit) != 0) continue;
                     agent.areaMask |= islandBit;
                     if (!agent.isOnNavMesh) Compat.Warp(emp.Movement, emp.transform.position);

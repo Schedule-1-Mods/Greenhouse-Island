@@ -55,7 +55,7 @@ namespace PelicanKey
             _targets.Clear();
             Show(true);
             _rainRenderers.Clear();
-            _nextRainScan = 0f;
+            _scanAt1 = _controllers.Count > 0 ? Time.time + 1f : 0f; _scanAt2 = 0f;
             _stamped = false; _gaveUp = false; _startedAt = -1f; _next = 0f;
             _mask = null;
         }
@@ -78,7 +78,6 @@ namespace PelicanKey
         // whatever the height map does.
         private static bool _hideInside = true;
         private static bool _hidden;
-        private static float _nextRainScan;
         private static readonly List<Renderer> _rainRenderers = new List<Renderer>();
 
         // Is this point inside the dome (on either floor, under its glass)?
@@ -99,9 +98,13 @@ namespace PelicanKey
             var cam = Camera.main;
             if (!_hideInside || site == null || cam == null) { Show(true); return; }
 
-            // Scanning every loaded object is expensive (a frame hitch each time): look often only
-            // until the rain effects turn up, then just now and then in case the game adds more.
-            if (Time.time >= _nextRainScan) { ScanRain(); _nextRainScan = Time.time + (_rainRenderers.Count > 0 ? 120f : 10f); }
+            // Looking through the scene for the rain effects is expensive (an 80 ms hitch), so it is not
+            // polled: the game tells us when it creates its rain (see TryPatch), and only then are
+            // the effects looked up - from the controller we were handed. If that hook is not
+            // available, one look through the scene is made, a while after loading.
+            if (_scanAt1 > 0f && Time.time >= _scanAt1) { _scanAt1 = 0f; ScanRain(); }
+            if (_scanAt2 > 0f && Time.time >= _scanAt2) { _scanAt2 = 0f; ScanRain(); }
+            if (_fallbackAt > 0f && Time.time >= _fallbackAt) { _fallbackAt = 0f; if (_controllers.Count == 0) FindControllerOnce(); }
 
             var p = cam.transform.position;
             var flat = new Vector2(p.x - site.Center.x, p.z - site.Center.z).magnitude;
@@ -120,15 +123,61 @@ namespace PelicanKey
         }
 
         // The rain effects: visual effects named for rain, or under a RainController.
+        // The game's rain controllers, as handed over when they wake up (see TryPatch).
+        private static readonly List<RainController> _controllers = new List<RainController>();
+        private static float _scanAt1, _scanAt2, _fallbackAt;
+        private static bool _patched;
+
+        public static void TryPatch(HarmonyLib.Harmony harmony)
+        {
+            if (_patched) return;
+            try
+            {
+                var awake = typeof(RainController).GetMethod("Awake", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.DeclaredOnly);
+                if (awake == null) return;
+                harmony.Patch(awake, postfix: new HarmonyLib.HarmonyMethod(typeof(RainShelter).GetMethod(nameof(RainWoke), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)));
+                _patched = true;
+            }
+            catch (System.Exception e)
+            {
+                Core.Log.Warning("Couldn't watch for the game's rain: " + e.Message);
+            }
+        }
+
+        private static void RainWoke(RainController __instance)
+        {
+            try
+            {
+                if (__instance == null) return;
+                _controllers.Add(__instance);
+                // Its effects are made around now (and a few more a little later).
+                _scanAt1 = Time.time + 2f;
+                _scanAt2 = Time.time + 15f;
+            }
+            catch { }
+        }
+
+        // Called when a scene is set up: if nothing has announced rain by a minute and a half in,
+        // look once.
+        public static void ArmFallback() => _fallbackAt = Time.time + 90f;
+
+        private static void FindControllerOnce()
+        {
+            try
+            {
+                var rc = Object.FindObjectOfType<RainController>();
+                if (rc != null) { _controllers.Add(rc); ScanRain(); }
+            }
+            catch { }
+        }
+
         private static void ScanRain()
         {
             int before = _rainRenderers.Count;
-            // The game's rain effects all hang under its RainController. Asking for just those
-            // (one or two objects) is far cheaper than going through every particle system and
-            // visual effect in the scene, which was a hitch of 10-25 ms each time it ran.
-            foreach (var rc in Object.FindObjectsOfType<RainController>())
+            for (int i = _controllers.Count - 1; i >= 0; i--)
             {
-                if (rc == null) continue;
+                var rc = _controllers[i];
+                if (rc == null) { _controllers.RemoveAt(i); continue; }
                 foreach (var r in rc.GetComponentsInChildren<Renderer>(true))
                 {
                     if (r == null || _rainRenderers.Contains(r)) continue;
